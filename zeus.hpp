@@ -14,27 +14,25 @@ class zeus {
 
 private:
 
-    //accept fd
-    int accept_fd;
-
-    //accept info
+    //accept port info
     struct socket_info accept_info;
 
     //accept thread id
     std::thread accept_pthread;
 
-    //------------------------------
-    //function ---------------------
-    //------------------------------
-
 
 public:
-    zeus(char* ip, int port);
+    bool running = true;
+
+    zeus(std::string ip, int port);
 
     ~zeus();
 
     void server_start();
     void accept_socket();
+    void shutdown(){
+        this->running = false;
+    }
 
 };
 

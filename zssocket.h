@@ -20,20 +20,21 @@
 struct socket_info {
     int listenfd_int;
     struct sockaddr_in sockeaddr_st;
+    bool isblock;
 };
 
 class zssocket {
 private:
 
 public:
-    bool static create_socket(char *ip, int port, struct socket_info *socketInfo) {
+    bool static create_socket(std::string ip, int port, bool isblock, struct socket_info *socketInfo) {
 
         // addr
         memset(&socketInfo->sockeaddr_st, 0, sizeof(socketInfo->sockeaddr_st));
 
         //init  addr
         socketInfo->sockeaddr_st.sin_family = AF_INET;
-        inet_pton(AF_INET, ip, &(socketInfo->sockeaddr_st.sin_addr));
+        inet_pton(AF_INET, ip.data(), &(socketInfo->sockeaddr_st.sin_addr));
 
         //init port
         socketInfo->sockeaddr_st.sin_port = htons(port);
@@ -67,9 +68,22 @@ public:
             return false;
         }
 
-        //set block
+        //set is blocking io
         int flags = fcntl(socketInfo->listenfd_int, F_GETFL, 0);
-        fcntl(socketInfo->listenfd_int, F_SETFL, flags & ~O_NONBLOCK);
+
+        if (isblock) {
+            if(fcntl(socketInfo->listenfd_int, F_SETFL, flags & ~O_NONBLOCK) < 0 ){
+                printf("set blocking error\n");
+                return false;
+            }
+            socketInfo->isblock = true;
+        } else {
+            if(fcntl(socketInfo->listenfd_int, F_SETFL, flags & O_NONBLOCK) < 0 ){
+                printf("set non blocking  error\n");
+                return false;
+            }
+            socketInfo->isblock = false;
+        }
 
         //bind
         if (bind(socketInfo->listenfd_int, (struct sockaddr *) &socketInfo->sockeaddr_st,
@@ -114,13 +128,13 @@ public:
         return recive_length;
     }
 
-    int static send_data(std::string data,int fd){
+    int static send_data(std::string data, int fd) {
         //send
         int ret = send(fd, data.data(), data.length(), 0);
         return ret;
     }
 
-    void static close(int fd){
+    void static close(int fd) {
         close(fd);
     }
 
