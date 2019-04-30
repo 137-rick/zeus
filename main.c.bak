@@ -1,0 +1,187 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <string.h>
+#include <netinet/in.h>
+#include <errno.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+
+#include "socket.h.bak"
+
+int init_epoll() {
+    //epoll event
+    int epollfd = epoll_create(SOCKET_MAX_EVENTS);
+    if (epollfd < 0) {
+        printf("create epoll fail %d, error:%s", epollfd, strerror(epollfd));
+        exit(-1);
+    }
+    return epollfd;
+}
+
+void add_epoll_event(int epollfd, int eventfd, uint32_t events) {
+    struct epoll_event event;
+    memset(&event, 0, sizeof(event));
+
+    event.events = events;
+    event.data.fd = eventfd;
+    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, eventfd, &event) < 0) {
+        printf("epoll event add fail");
+        exit(-1);
+    }
+}
+
+void create_socket(char *ip, int port , struct socket_info *socketInfoi) {
+
+    //zeus addr
+    memset(&socketInfoi->sockeaddr_st, 0, sizeof(socketInfoi->sockeaddr_st));
+
+    //init zeus addr
+    socketInfoi->sockeaddr_st.sin_family = AF_INET;
+    inet_pton(AF_INET, ip, &(socketInfoi->sockeaddr_st.sin_addr));
+
+    //init port
+    socketInfoi->sockeaddr_st.sin_port = htons(port);
+
+    //zeus listenfd
+    socketInfoi->listenfd_int = socket(AF_INET, SOCK_STREAM, 0);
+
+
+    //zeus addr reuse
+    int option = 1;
+    if (setsockopt(socketInfoi->listenfd_int, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(int)) != 0) {
+        printf("set reuse addr error\n");
+        exit(-1);
+    }
+
+    //zeus port reuse
+    if (setsockopt(socketInfoi->listenfd_int, SOL_SOCKET, SO_REUSEPORT, &option, sizeof(int)) != 0) {
+        printf("set reuse port error\n");
+        exit(-1);
+
+    }
+
+    //zeus send buffer
+    uint32_t buffer_size = SOCKET_BUFFER_MAXSIZE;
+    if (setsockopt(socketInfoi->listenfd_int, SOL_SOCKET, SO_SNDBUF, &buffer_size, sizeof(buffer_size)) != 0) {
+        printf("set send buff error\n");
+        exit(-1);
+
+    }
+
+    //zeus receive buffer
+    if (setsockopt(socketInfoi->listenfd_int, SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(buffer_size)) != 0) {
+        printf("set recive buff error\n");
+        exit(-1);
+
+    }
+
+    //set block
+    int flags = fcntl(socketInfoi->listenfd_int, F_GETFL, 0);
+    fcntl(global_server.listenfd_int, F_SETFL, flags & ~O_NONBLOCK);
+
+    //bind
+    if (bind(socketInfoi->listenfd_int, (struct sockaddr *) &socketInfoi->sockeaddr_st,
+             sizeof(global_server.sockaddr_st)) < 0) {
+        printf("bind port error\n");
+        exit(-1);
+
+    }
+
+    //listen
+    if (listen(socketInfoi->listenfd_int, (int) SOCKET_BACKLOG) < 0) {
+        printf(" listen port error\n");
+        exit(-1);
+    }
+}
+
+
+void accept_conn(int listen_fd) {
+    struct sockaddr_in sockaddr_st;
+    socklen_t len = sizeof(struct sockaddr_in);
+    memset(&sockaddr_st,0,sizeof(sockaddr_st));
+
+    int confd = accept(listen_fd, (struct sockaddr *) &sockaddr_st, &len);
+
+    if (confd < 0) {
+        printf("accept fail\n");
+        return;
+    } else {
+        printf("accept connection %d\n", confd);
+    }
+    add_epoll_event(global_server.epollfd_int,confd,EPOLLIN );
+
+}
+
+void recv_data(int fd) {
+    char read_buff[SOCKET_BUFFER_MAXSIZE];
+    int recive_length = recv(fd, read_buff, sizeof(read_buff), 0);
+    read_buff[recive_length] = '\0';
+    printf("recv msg from client %s\n", read_buff);
+}
+
+void start_server() {
+
+    //make the server start
+    global_server.isstop = 0;
+
+    struct socket_info socketInfo;
+    //create scoket
+    create_socket("127.0.0.1", 10086,&socketInfo);
+    global_server.listenfd_int = socketInfo.listenfd_int;
+    global_server.sockaddr_st = socketInfo.sockeaddr_st;
+
+    //create epoll
+    global_server.epollfd_int = init_epoll();
+
+    //add listen event monitor
+    add_epoll_event(global_server.epollfd_int, global_server.listenfd_int, EPOLLIN );
+
+    //main loop
+    while (!global_server.isstop) {
+        int timeout = 3000;
+
+        int ret = epoll_wait(global_server.epollfd_int, global_server.eventlist_st, SOCKET_MAX_EVENTS, timeout);
+        if (ret < 0) {
+            printf("1epoll error %d,%s\n", errno, strerror(errno));
+            break;
+        } else if (ret == 0) {
+            //printf("timeout\n");
+            continue;
+        }
+
+        for (int i = 0; i < ret; i++) {
+            if (global_server.eventlist_st[i].events & EPOLLERR ||
+                global_server.eventlist_st[i].events & EPOLLHUP ||
+                !(global_server.eventlist_st[i].events & EPOLLIN)) {
+                printf("epoll event error event:%d fd:%d\n", global_server.eventlist_st[i].events , global_server.eventlist_st[i].data.fd);
+                close(global_server.eventlist_st[i].data.fd);
+                continue;
+            }
+            if (global_server.eventlist_st[i].data.fd == global_server.listenfd_int) {
+                accept_conn(global_server.listenfd_int);
+            } else {
+                recv_data(global_server.eventlist_st[i].data.fd);
+                //response
+                char *resp = "HTTP/1.1 200 OK\r\nContent-Length: 3\r\nConnection: keep-alive\r\n\r\n123";
+
+                //send
+                send(global_server.eventlist_st[i].data.fd, resp, strlen(resp), 0);
+                //todo keep alive
+                //close(global_server.eventlist_st[i].data.fd);
+            }
+
+
+        }
+
+    }
+    close(global_server.epollfd_int);
+    close(global_server.listenfd_int);
+}
+
+int main() {
+
+    start_server();
+    return 0;
+}

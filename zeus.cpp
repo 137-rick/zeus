@@ -11,9 +11,6 @@ zeus::zeus(std::string ip, int port) {
         exit(-1);
     }
 
-    //create epoll for read write event
-    this->event_epoll_fd = zsepoll::create_epoll();
-
 
 }
 
@@ -26,37 +23,61 @@ void zeus::server_start() {
     this->running = true;
 
     //accept thread
-    this->accept_thread = std::thread(&zeus::accept_socket_thread,this);
+    this->accept_thread = std::thread(&zeus::accept_socket_thread, this);
 
-    //event loop
-    this->wait_event_thread = std::thread(&zeus::event_wait_thread,this);
-
+    //create the wait event thread
+    for (int thread_id = 0; thread_id < 16; thread_id++) {
+        event_thread_list[thread_id].id = thread_id;
+        event_thread_list[thread_id].event_epoll_fd = zsepoll::create_epoll();
+        event_thread_list[thread_id].thread = std::thread(&zeus::event_wait_thread, this, thread_id);
+    }
 }
 
 //accept the socket
 void zeus::accept_socket_thread() {
     while (this->running) {
         //accept
-        int connfd = zssocket::accept_conn(this->accept_info.listenfd_int,&(this->accept_info.sockeaddr_st));
-        if(connfd>0){
+        int connfd = zssocket::accept_conn(this->accept_info.listenfd_int, &(this->accept_info.sockeaddr_st));
+        if (connfd > 0) {
+
+            int thread_id = connfd % 16;
+
             //add request event monitor with epoll
-            zsepoll::add_epoll_event(this->event_epoll_fd,connfd,EPOLLIN);
+            zsepoll::add_epoll_event(this->event_thread_list[thread_id].event_epoll_fd
+                    , connfd, EPOLLIN);
         }
     }
 
 }
 
-void zeus::event_wait_thread(){
+//wait event
+void zeus::event_wait_thread(int thread_id) {
+    struct epoll_event eventlist_st[SOCKET_MAX_EVENTS];
+
     while (this->running) {
-        /*
-        nt ret = epoll_wait(global_server.epollfd_int, global_server.eventlist_st, SOCKET_MAX_EVENTS, timeout);
+
+        int ret = epoll_wait(this->event_thread_list[thread_id].event_epoll_fd
+                , eventlist_st, SOCKET_MAX_EVENTS, 3000);
         if (ret < 0) {
-            printf("1epoll error %d,%s\n", errno, strerror(errno));
+            printf("epoll error %d,%s\n", errno, strerror(errno));
             break;
         } else if (ret == 0) {
             //printf("timeout\n");
             continue;
-        }*/
+        }
+
+        for (int i = 0; i < ret; i++) {
+            if (eventlist_st[i].events & EPOLLERR ||
+                eventlist_st[i].events & EPOLLHUP ||
+                !(eventlist_st[i].events & EPOLLIN)) {
+                printf("epoll event error event:%d fd:%d\n", eventlist_st[i].events, eventlist_st[i].data.fd);
+                close(eventlist_st[i].data.fd);
+                continue;
+            }
+
+            //http process
+
+        }
     }
 }
 
@@ -75,7 +96,7 @@ int main() {
 
     //main wait
     //todo wait fork worker process
-    while (zeus_server->running){
+    while (zeus_server->running) {
         sleep(1);
     }
     //release the server

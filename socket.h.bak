@@ -1,0 +1,39 @@
+#ifndef SOCKET_SOCKET_H
+
+    #include "sys/epoll.h"
+
+    #define SOCKET_SOCKET_H
+
+    #define SOCKET_BUFFER_MAXSIZE 1024
+
+    #define SOCKET_TIMEOUT 1
+
+    #define SOCKET_BACKLOG 1024
+
+    #define SOCKET_MAX_EVENTS 1024
+
+    struct socket_server {
+        //listen fd
+        int listenfd_int;
+
+        //addr
+        struct sockaddr_in sockaddr_st;
+
+        //stop server flag
+        int isstop;
+
+        //epoll fd
+        int epollfd_int;
+
+        //epoll struct
+        struct epoll_event eventlist_st[SOCKET_MAX_EVENTS];
+
+    } global_server;
+
+
+    struct socket_info {
+        int listenfd_int;
+        struct sockaddr_in sockeaddr_st;
+    };
+
+#endif //SOCKET_SOCKET_H

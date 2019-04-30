@@ -11,6 +11,29 @@
 #include "zssocket.h"
 #include "zsepoll.hpp"
 
+struct event_info {
+    //io fd
+    int fd;
+
+    //event type 0 read 1 write
+    int event_type;
+};
+
+struct event_thread_epoll {
+
+    int id;
+
+    //epoll fd
+    int event_epoll_fd;
+
+    //wait event
+    std::unordered_map<int, event_info> event_queue;
+
+    //thread for process
+    std::thread thread;
+
+};
+
 class zeus {
 
 private:
@@ -21,11 +44,9 @@ private:
     //accept thread id
     std::thread accept_thread;
 
-    //epoll fd
-    int event_epoll_fd;
+    //event thread
+    std::unordered_map<int,event_thread_epoll> event_thread_list;
 
-    //waite thread
-    std::thread wait_event_thread;
 
 public:
     bool running = true;
@@ -35,11 +56,14 @@ public:
     ~zeus();
 
     void server_start();
+
     void accept_socket_thread();
-    void event_wait_thread();
+
+    void event_wait_thread(int thread_id);
+
     void on_receive_thread(int fd);
 
-    void shutdown(){
+    void shutdown() {
         this->running = false;
     }
 
