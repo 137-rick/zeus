@@ -9,6 +9,7 @@
 #include <list>
 
 #include "zssocket.h"
+#include "zsepoll.hpp"
 
 class zeus {
 
@@ -18,8 +19,13 @@ private:
     struct socket_info accept_info;
 
     //accept thread id
-    std::thread accept_pthread;
+    std::thread accept_thread;
 
+    //epoll fd
+    int event_epoll_fd;
+
+    //waite thread
+    std::thread wait_event_thread;
 
 public:
     bool running = true;
@@ -29,7 +35,10 @@ public:
     ~zeus();
 
     void server_start();
-    void accept_socket();
+    void accept_socket_thread();
+    void event_wait_thread();
+    void on_receive_thread(int fd);
+
     void shutdown(){
         this->running = false;
     }
