@@ -124,7 +124,7 @@ public:
         if (recive_length <= 0) return 0;
 
         read_buff[recive_length] = '\0';
-        printf("recv msg from client %s\n", read_buff);
+        //printf("recv msg from client %s\n", read_buff);
         return recive_length;
     }
 

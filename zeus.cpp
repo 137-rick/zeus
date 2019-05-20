@@ -41,7 +41,7 @@ void zeus::server_start() {
     for (int thread_id = 0; thread_id < 16; thread_id++) {
         event_thread_list[thread_id].id = thread_id;
         event_thread_list[thread_id].event_epoll_fd = zsepoll::create_epoll();
-        event_thread_list[thread_id].thread = std::thread(&zeus::event_wait_thread, this, thread_id);
+        event_thread_list[thread_id].thread = std::move(std::thread(&zeus::event_wait_thread, this, thread_id));
     }
 }
 
