@@ -13,7 +13,7 @@ private:
 
 public:
 
-    int static create_epoll() {
+    static int  create_epoll() {
         int epollfd = epoll_create(SOCKET_MAX_EVENTS);
         if (epollfd < 0) {
             printf("create epoll fail %d, error:%s", epollfd, strerror(epollfd));
@@ -22,7 +22,7 @@ public:
         return epollfd;
     }
 
-    void static add_epoll_event(int epollfd, int eventfd, uint32_t events) {
+    static void  add_epoll_event(const int epollfd, const int eventfd,const uint32_t events) {
         struct epoll_event event;
         memset(&event, 0, sizeof(event));
 

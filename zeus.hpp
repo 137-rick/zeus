@@ -51,7 +51,7 @@ private:
 public:
     bool running = true;
 
-    zeus(std::string ip, int port);
+    zeus(const std::string ip, const int port);
 
     ~zeus();
 
@@ -59,9 +59,9 @@ public:
 
     void accept_socket_thread();
 
-    void event_wait_thread(int thread_id);
+    void event_wait_thread(const int thread_id);
 
-    void on_receive_thread(int fd);
+    void on_receive_thread(const int fd);
 
     void shutdown() {
         this->running = false;

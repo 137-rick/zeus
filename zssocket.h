@@ -27,7 +27,7 @@ class zssocket {
 private:
 
 public:
-    bool static create_socket(std::string ip, int port, bool isblock, struct socket_info *socketInfo) {
+    static bool  create_socket(std::string ip, int port, bool isblock, struct socket_info *socketInfo) {
 
         // addr
         memset(&socketInfo->sockeaddr_st, 0, sizeof(socketInfo->sockeaddr_st));
@@ -101,7 +101,7 @@ public:
     }
 
 
-    int static accept_conn(int listen_fd, struct sockaddr_in *sockaddr_st) {
+    static int accept_conn(int listen_fd, struct sockaddr_in *sockaddr_st) {
         socklen_t len = sizeof(struct sockaddr_in);
 
         int confd = accept(listen_fd, (struct sockaddr *) &sockaddr_st, &len);
@@ -118,7 +118,7 @@ public:
 
     }
 
-    int static recv_data(int fd) {
+    static int recv_data(int fd) {
         char read_buff[SOCKET_BUFFER_MAXSIZE];
         int recive_length = recv(fd, read_buff, sizeof(read_buff), 0);
         if (recive_length <= 0) return 0;
@@ -128,13 +128,13 @@ public:
         return recive_length;
     }
 
-    int static send_data(std::string data, int fd) {
+    static int send_data(std::string data, int fd) {
         //send
         int ret = send(fd, data.data(), data.length(), 0);
         return ret;
     }
 
-    void static close(int fd) {
+    static void  close(int fd) {
         close(fd);
     }
 

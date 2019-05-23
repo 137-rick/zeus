@@ -2,7 +2,7 @@
 #include "zssocket.h"
 #include <csignal>
 
-zeus::zeus(std::string ip, int port) {
+zeus::zeus(const std::string ip, const int port) {
 
     //create socket for listen
     bool ret = zssocket::create_socket(ip, port, true, &(this->accept_info));
@@ -63,7 +63,7 @@ void zeus::accept_socket_thread() {
 }
 
 //wait event
-void zeus::event_wait_thread(int thread_id) {
+void zeus::event_wait_thread(const int thread_id) {
     struct epoll_event eventlist_st[SOCKET_MAX_EVENTS];
 
     while (this->running) {
