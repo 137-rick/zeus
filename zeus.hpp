@@ -17,6 +17,15 @@ struct event_info {
 
     //event type 0 read 1 write
     int event_type;
+
+    //which reactor using
+    int thread_id;
+
+    //send buff
+    std::string send;
+
+    //recive buff
+    std::string recive;
 };
 
 struct event_thread_epoll {

@@ -51,12 +51,22 @@ void zeus::accept_socket_thread() {
         //accept
         int connfd = zssocket::accept_conn(this->accept_info.listenfd_int, &(this->accept_info.sockeaddr_st));
         if (connfd > 0) {
+            //epoll info
+            struct event_info epollInfo;
 
             //send with fd
             int thread_id = connfd % 16;
 
+            //epoll
+            epollInfo.event_type = EPOLLIN | EPOLLET;
+            epollInfo.fd = connfd;
+            epollInfo.thread_id = thread_id;
+
             //add request event monitor with epoll
-            zsepoll::add_epoll_event(this->event_thread_list[thread_id].event_epoll_fd, connfd, EPOLLIN);
+            zsepoll::add_epoll_event(this->event_thread_list[thread_id].event_epoll_fd, connfd, EPOLLIN | EPOLLET);
+
+            //add the record
+            event_thread_list[thread_id].event_queue[connfd] = std::move(epollInfo);
         }
     }
 
@@ -100,13 +110,21 @@ void zeus::event_wait_thread(const int thread_id) {
 
             //todo:can send
             if (eventlist_st[i].events & EPOLLOUT) {
-
+                //return 0
             }
 
+            //close
             if (eventlist_st[i].events & EPOLLERR ||
                 eventlist_st[i].events & EPOLLHUP) {
-                printf("epoll event error event:%d fd:%d\n", eventlist_st[i].events, eventlist_st[i].data.fd);
+                //printf("epoll event error event:%d fd:%d\n", eventlist_st[i].events, eventlist_st[i].data.fd);
+
+                //add request event monitor with epoll
+                zsepoll::remove_epoll_event(this->event_thread_list[thread_id].event_epoll_fd, eventlist_st[i].data.fd);
+
+                //remove the record
+                event_thread_list[thread_id].event_queue.erase(eventlist_st[i].data.fd);
                 close(eventlist_st[i].data.fd);
+
                 continue;
             }
 
